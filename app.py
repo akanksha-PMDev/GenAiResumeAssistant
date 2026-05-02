@@ -42,16 +42,140 @@ def query_ollama(prompt):
 
 
 def get_mock_response(resume, jd):
+    """Generate realistic mock response based on resume-JD keyword matching."""
+    resume_lower = resume.lower()
+    jd_lower = jd.lower()
+    
+    # Key technical keywords to check
+    tech_keywords = {
+        'python': 2, 'django': 3, 'flask': 2, 'postgresql': 3, 'mysql': 2,
+        'aws': 3, 'docker': 2, 'kubernetes': 3, 'redis': 2, 'javascript': 2,
+        'react': 2, 'node': 2, 'typescript': 2, 'mongodb': 2, 'git': 1,
+        'ci/cd': 2, 'kafka': 3, 'elasticsearch': 3, 'terraform': 3,
+        'microservices': 3, 'rest': 1, 'api': 1, 'graphql': 2,
+        'machine learning': 3, 'tensorflow': 3, 'pytorch': 3, 'scikit': 2,
+        'pandas': 2, 'numpy': 2, 'sql': 2, 'nosql': 2
+    }
+    
+    # Check experience keywords
+    exp_keywords = {
+        'years': 1, 'experience': 1, 'led': 2, 'team': 2, 'mentor': 2,
+        'senior': 2, 'junior': 1, 'architect': 3, 'manager': 2,
+        'scaled': 3, 'millions': 3, 'users': 1, 'performance': 2,
+        'optimized': 2, 'reduced': 2, 'improved': 2, 'increased': 2,
+        'designed': 2, 'implemented': 2, 'deployed': 2, 'built': 1,
+        'maintained': 1, 'debugged': 1, 'tested': 1
+    }
+    
+    # Calculate matches
+    matched_keywords = []
+    missing_keywords = []
+    resume_score = 0
+    max_score = 0
+    
+    for keyword, weight in tech_keywords.items():
+        max_score += weight
+        if keyword in resume_lower:
+            resume_score += weight
+            matched_keywords.append(keyword)
+        elif keyword in jd_lower:
+            missing_keywords.append(keyword.title())
+    
+    exp_score = 0
+    for keyword, weight in exp_keywords.items():
+        if keyword in resume_lower:
+            exp_score += weight
+    
+    # Calculate percentage (cap at 95%)
+    if max_score > 0:
+        tech_match = (resume_score / max_score) * 70  # Tech = 70% of score
+        exp_match = min((exp_score / 15) * 30, 30)     # Exp = 30% of score
+        match_pct = min(int(tech_match + exp_match), 95)
+    else:
+        match_pct = 50
+    
+    # If JD asks for things not in resume, deduct
+    if missing_keywords:
+        deduction = min(len(missing_keywords) * 3, 25)
+        match_pct = max(match_pct - deduction, 10)
+    
+    # Generate improvement suggestions based on missing items
+    suggestions = []
+    if missing_keywords:
+        # Only add up to 3 context-aware suggestions
+        added = 0
+        for kw in missing_keywords[:3]:
+            if added >= 3:
+                break
+            kw_lower = kw.lower()
+            if any(f in kw_lower for f in ['python', 'django', 'flask', 'framework']) and added < 3:
+                suggestions.append("Highlight Python framework experience (Django/Flask) and REST API development")
+                added += 1
+            elif any(f in kw_lower for f in ['postgresql', 'mysql', 'database', 'sql']) and added < 3:
+                suggestions.append("Include database experience (PostgreSQL, MySQL) and query optimization")
+                added += 1
+            elif any(f in kw_lower for f in ['aws', 'cloud', 'docker', 'kubernetes']) and added < 3:
+                suggestions.append("Mention cloud deployment and containerization experience")
+                added += 1
+            elif any(f in kw_lower for f in ['performance', 'redis', 'optimize']) and added < 3:
+                suggestions.append("Quantify performance improvements with metrics")
+                added += 1
+    
+    if not suggestions:
+        suggestions = [
+            "Add specific metrics to quantify achievements",
+            "Include links to portfolio or GitHub repositories"
+        ]
+    
+    # Ensure exactly 3 suggestions
+    while len(suggestions) < 3:
+        extras = [
+            "Review alignment between resume bullets and job requirements",
+            "Quantify achievements with specific metrics and impact",
+            "Include relevant technical keywords from the job description"
+        ]
+        for s in extras:
+            if s not in suggestions:
+                suggestions.append(s)
+                if len(suggestions) >= 3:
+                    break
+    
+    # Generate rewritten bullet with metrics
+    bullet_templates = [
+        "Designed and implemented scalable systems serving {users}+ users, improving performance by {pct}% through {tech} optimization",
+        "Led a team of {team} engineers to deliver {project}, resulting in {impact}% improvement in {metric}",
+        "Architected {system} using {tech}, reducing latency from {old}ms to {new}ms ({pct}% improvement)",
+        "Built and deployed {feature} handling {volume} requests/day with {tech}, achieving {uptime}% uptime"
+    ]
+    
+    import random
+    template = random.choice(bullet_templates)
+    rewritten = template.format(
+        users=random.choice(["100K", "50K", "250K", "1M"]),
+        pct=random.choice([30, 40, 50, 60]),
+        tech=random.choice(["Redis caching", "database queries", "API endpoints"]),
+        team=random.choice(["3", "5", "8"]),
+        project=random.choice(["microservices platform", "data pipeline", "API gateway"]),
+        impact=random.choice([25, 35, 50, 60]),
+        metric=random.choice(["response time", "throughput", "efficiency"]),
+        system=random.choice(["REST API", "data processing pipeline", "event-driven system"]),
+        old=random.choice([200, 250, 300]),
+        new=random.choice([80, 85, 100, 120]),
+        feature=random.choice(["authentication service", "payment processing", "real-time notifications"]),
+        volume=random.choice(["10K", "50K", "100K"]),
+        uptime=random.choice(["99.9", "99.95", "99.99"])
+    )
+    
+    # Cap match score at what we actually found
+    if len(matched_keywords) == 0 and 'python' not in resume_lower.lower():
+        match_pct = min(match_pct, 40)
+    
     return {
-        "match_score": "78%",
-        "missing_keywords": ["Kubernetes", "AWS Lambda", "PostgreSQL optimization"],
-        "improvement_suggestions": [
-            "Quantify achievements with specific metrics",
-            "Highlight PostgreSQL expertise and database optimization",
-            "Include cloud architecture and deployment pipeline details"
-        ],
-        "rewritten_bullet": "Architected and deployed a scalable REST API serving 150K+ daily active users, implementing Redis caching and PostgreSQL query optimization that reduced average response time from 250ms to 85ms (66% improvement)",
-        "note": "Mock response (Ollama not available)"
+        "match_score": f"{match_pct}%",
+        "missing_keywords": missing_keywords[:5] if missing_keywords else ["Strong alignment - no major gaps detected"],
+        "improvement_suggestions": suggestions,
+        "rewritten_bullet": f"- {rewritten}",
+        "note": f"Mock analysis based on keyword matching (Ollama not available in this environment)"
     }
 
 def parse_ollama_response_v2(text, resume, jd):
@@ -85,7 +209,7 @@ def parse_ollama_response_v2(text, resume, jd):
                 cl = ''
             if cl and len(cl) > 10:
                 tgt = result["missing_keywords"] if current_section == 'keywords' else result["improvement_suggestions"]
-                limit = 10 if current_section == 'keywords' else 5
+                limit = 10 if current_section == 'keywords' else 3
                 if cl not in tgt and len(tgt) < limit:
                     tgt.append(cl)
         elif current_section == 'bullet':
