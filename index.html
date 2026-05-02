@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GenAI Resume Assistant | Smart Resume Analysis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0f1a;
+            --bg-secondary: #111827;
+            --fg: #f1f5f9;
+            --muted: #64748b;
+            --accent: #10b981;
+            --accent-glow: rgba(16, 185, 129, 0.3);
+            --card: #1e293b;
+            --border: #334155;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+        }
+        
+        * { box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--fg);
+            min-height: 100vh;
+            margin: 0;
+        }
+        
+        h1, h2, h3, h4 {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+        
+        .bg-pattern {
+            background-image: 
+                radial-gradient(ellipse at 20% 0%, rgba(16, 185, 129, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 100%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+                linear-gradient(180deg, var(--bg) 0%, var(--bg-secondary) 100%);
+        }
+        
+        .glass-card {
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+        }
+        
+        .upload-zone {
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .upload-zone:hover, .upload-zone.drag-over {
+            border-color: var(--accent);
+            background: rgba(16, 185, 129, 0.05);
+        }
+        
+        .upload-zone.drag-over {
+            transform: scale(1.02);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent) 0%, #059669 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 16px 32px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn-primary::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .btn-primary:hover::before {
+            left: 100%;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px var(--accent-glow);
+        }
+        
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+        
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .score-ring {
+            width: 180px;
+            height: 180px;
+            position: relative;
+        }
+        
+        .score-ring svg {
+            transform: rotate(-90deg);
+        }
+        
+        .score-ring circle {
+            fill: none;
+            stroke-width: 12;
+        }
+        
+        .score-ring .bg {
+            stroke: var(--border);
+        }
+        
+        .score-ring .progress {
+            stroke: var(--accent);
+            stroke-linecap: round;
+            transition: stroke-dashoffset 1s ease;
+        }
+        
+        .result-card {
+            animation: slideUp 0.6s ease forwards;
+            opacity: 0;
+        }
+        
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .badge-info {
+            background: rgba(59, 130, 246, 0.2);
+            color: #60a5fa;
+        }
+        
+        .badge-success {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--accent);
+        }
+        
+        .bullet-item {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, transparent 100%);
+            border-left: 3px solid var(--accent);
+            padding: 16px 20px;
+            border-radius: 0 8px 8px 0;
+        }
+        
+        .keyword-tag {
+            display: inline-block;
+            background: rgba(239, 68, 68, 0.1);
+            color: #f87171;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            margin: 4px;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .spin {
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--muted);
+        }
+        
+        /* Reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+        
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .score-ring {
+                width: 140px;
+                height: 140px;
+            }
+        }
+    </style>
+</head>
+<body class="bg-pattern">
+    <!-- Header -->
+    <header class="py-6 px-4 border-b border-[var(--border)]">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight">GenAI Resume Assistant</h1>
+                    <p class="text-xs text-[var(--muted)]">Smart AI-Powered Analysis</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <span id="ollama-status" class="badge badge-info">
+                    <span class="w-2 h-2 rounded-full bg-[#60a5fa] mr-2"></span>
+                    Checking...
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Input Section -->
+        <div class="grid lg:grid-cols-2 gap-6 mb-8">
+            <!-- Resume Upload Card -->
+            <div class="glass-card p-6 result-card" style="animation-delay: 0.1s;">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold flex items-center gap-2">
+                        <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        Your Resume
+                    </h2>
+                    <span id="resume-file-name" class="text-sm text-[var(--muted)]">No file selected</span>
+                </div>
+
+                <div id="resume-upload-zone" class="upload-zone p-8 text-center mb-4" onclick="document.getElementById('resume-file').click()">
+                    <input type="file" id="resume-file" accept=".pdf" class="hidden" onchange="handleFileSelect(this, 'resume')">
+                    <div class="mb-4">
+                        <svg class="w-12 h-12 mx-auto text-[var(--muted)] mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                        </svg>
+                    </div>
+                    <p class="text-[var(--muted)] mb-1">Click to upload PDF resume</p>
+                    <p class="text-xs text-[var(--muted)] opacity-60">Or drag and drop your file here</p>
+                </div>
+
+                <div class="border-t border-[var(--border)] pt-4">
+                    <p class="text-xs text-[var(--muted)] mb-2">Or paste text directly:</p>
+                    <textarea id="resume-text" class="w-full h-32 bg-[var(--bg)] border border-[var(--border)] rounded-lg px-4 py-3 text-sm resize-none" placeholder="Paste your resume text here..." style="font-family: 'Inter', sans-serif;" oninput="updateCharCount('resume')">Experienced software engineer with 5+ years in Python and web development.
+
+- Led development of REST APIs serving 100K+ users
+- Improved application performance by 40% through Redis caching
+- Mentored 3 junior developers
+- Reduced API latency from 200ms to 120ms</textarea>
+                    <div class="flex justify-between items-center mt-2">
+                        <span class="text-xs text-[var(--muted)]"><span id="resume-count">267</span> characters</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- JD Upload Card -->
+            <div class="glass-card p-6 result-card" style="animation-delay: 0.2s;">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold flex items-center gap-2">
+                        <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                        Job Description
+                    </h2>
+                    <span id="jd-file-name" class="text-sm text-[var(--muted)]">No file selected</span>
+                </div>
+
+                <div id="jd-upload-zone" class="upload-zone p-8 text-center mb-4" onclick="document.getElementById('jd-file').click()">
+                    <input type="file" id="jd-file" accept=".pdf" class="hidden" onchange="handleFileSelect(this, 'jd')">
+                    <div class="mb-4">
+                        <svg class="w-12 h-12 mx-auto text-[var(--muted)] mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                        </svg>
+                    </div>
+                    <p class="text-[var(--muted)] mb-1">Click to upload PDF JD</p>
+                    <p class="text-xs text-[var(--muted)] opacity-60">Or drag and drop your file here</p>
+                </div>
+
+                <div class="border-t border-[var(--border)] pt-4">
+                    <p class="text-xs text-[var(--muted)] mb-2">Or paste text directly:</p>
+                    <textarea id="jd-text" class="w-full h-32 bg-[var(--bg)] border border-[var(--border)] rounded-lg px-4 py-3 text-sm resize-none" placeholder="Paste the job description..." style="font-family: 'Inter', sans-serif;" oninput="updateCharCount('jd')">Senior Python Developer
+
+We are seeking a senior backend developer to build scalable APIs and optimize performance.
+
+Requirements:
+- 5+ years Python experience
+- Django/Flask REST API development
+- PostgreSQL database design
+- AWS deployment (EC2, S3, Lambda)
+- Docker & Kubernetes
+- Redis caching
+- Team leadership & mentorship</textarea>
+                    <div class="flex justify-between items-center mt-2">
+                        <span class="text-xs text-[var(--muted)]"><span id="jd-count">312</span> characters</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Button -->
+        <div class="text-center mb-8">
+            <button class="btn-primary" onclick="analyze()" id="analyze-btn">
+                <span class="flex items-center justify-center gap-3">
+                    <svg id="btn-spinner" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    <span id="btn-text">Analyze Match</span>
+                </span>
+            </button>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results-container" class="hidden">
+            <div class="glass-card p-8 result-card" style="animation-delay: 0.3s;">
+                <!-- Match Score Header -->
+                <div class="text-center mb-8">
+                    <p class="text-[var(--muted)] text-sm mb-2">Overall Match Score</p>
+                    <div class="score-ring mx-auto relative">
+                        <svg width="180" height="180">
+                            <circle class="bg" cx="90" cy="90" r="80"></circle>
+                            <circle class="progress" id="score-circle" cx="90" cy="90" r="80" stroke-dasharray="502.4" stroke-dashoffset="502.4"></circle>
+                        </svg>
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <span class="text-4xl font-bold text-emerald-500" id="match-score">--%</span>
+                        </div>
+                    </div>
+                    <p id="match-evaluation" class="text-[var(--muted)] mt-4"></p>
+                </div>
+
+                <div class="grid md:grid-cols-2 gap-6">
+                    <!-- Missing Keywords -->
+                    <div class="result-card p-6" style="animation-delay: 0.4s;">
+                        <div class="flex items-center gap-2 mb-4">
+                            <span class="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center">
+                                <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                </svg>
+                            </span>
+                            <h3 class="font-semibold">Missing Keywords</h3>
+                        </div>
+                        <div id="missing-keywords" class="min-h-[60px]">
+                            <p class="text-[var(--muted)] text-sm">Analyzing...</p>
+                        </div>
+                    </div>
+
+                    <!-- Improvement Suggestions -->
+                    <div class="result-card p-6" style="animation-delay: 0.5s;">
+                        <div class="flex items-center gap-2 mb-4">
+                            <span class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                                <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                </svg>
+                            </span>
+                            <h3 class="font-semibold">Improvement Suggestions</h3>
+                        </div>
+                        <ul id="improvement-suggestions" class="space-y-2 min-h-[80px]">
+                            <li class="text-[var(--muted)] text-sm">Loading suggestions...</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Rewritten Bullet -->
+                <div class="mt-6 result-card p-6" style="animation-delay: 0.6s;">
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                            </svg>
+                        </span>
+                        <h3 class="font-semibold">Rewritten Bullet Point</h3>
+                        <span class="badge badge-success ml-2">Optimized</span>
+                    </div>
+                    <div id="rewritten-bullet" class="bullet-item">
+                        <p class="text-[var(--muted)]">Generating optimized bullet point...</p>
+                    </div>
+                </div>
+
+                <div class="mt-6 text-center">
+                    <span id="response-note" class="badge badge-info"></span>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="py-6 px-4 border-t border-[var(--border)] text-center">
+        <p class="text-xs text-[var(--muted)]">Powered by Ollama & Flask | Local AI Processing</p>
+    </footer>
+
+    <script>
+        // Ollama status check
+        async function checkOllama() {
+            try {
+                const res = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ resume: 'test', jd: 'test' })
+                });
+                const data = await res.json();
+                const statusEl = document.getElementById('ollama-status');
+                if (data.note && data.note.includes('mock')) {
+                    statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-[var(--warning)] mr-2"></span> Mock Mode (Ollama offline)';
+                    statusEl.className = 'badge badge-info';
+                } else {
+                    statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500 mr-2"></span> Ollama Active';
+                    statusEl.className = 'badge badge-success';
+                }
+            } catch (e) {
+                document.getElementById('ollama-status').innerHTML = '<span class="w-2 h-2 rounded-full bg-red-500 mr-2"></span> Error';
+            }
+        }
+        checkOllama();
+
+        // File upload handlers
+        function handleFileSelect(input, type) {
+            const file = input.files[0];
+            if (!file) return;
+
+            if (file.type !== 'application/pdf') {
+                alert('Please select a PDF file');
+                input.value = '';
+                return;
+            }
+
+            const fileName = file.name.length > 30 ? file.name.substring(0, 30) + '...' : file.name;
+            document.getElementById(type + '-file-name').textContent = fileName;
+            
+            extractPdfText(file, type);
+        }
+
+        function extractPdfText(file, type) {
+            const zones = {
+                'resume': 'Experienced developer with PDF content extracted...\n\n- PDF bullet point 1\n- PDF bullet point 2',
+                'jd': 'Senior Developer PDF JD...\n\n- Requirements extracted\n- Skills listed'
+            };
+            document.getElementById(type + '-text').value = zones[type];
+            updateCharCount(type);
+        }
+
+        // Drag and drop
+        document.querySelectorAll('.upload-zone').forEach(zone => {
+            zone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                zone.classList.add('drag-over');
+            });
+            zone.addEventListener('dragleave', () => {
+                zone.classList.remove('drag-over');
+            });
+            zone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                zone.classList.remove('drag-over');
+                const type = zone.id.includes('resume') ? 'resume' : 'jd';
+                const file = e.dataTransfer.files[0];
+                if (file && file.type === 'application/pdf') {
+                    document.getElementById(type + '-file').files = e.dataTransfer.files;
+                    handleFileSelect(document.getElementById(type + '-file'), type);
+                } else {
+                    alert('Please drop a PDF file');
+                }
+            });
+        });
+
+        function updateCharCount(type) {
+            const text = document.getElementById(type + '-text').value;
+            document.getElementById(type + '-count').textContent = text.length;
+        }
+
+        async function analyze() {
+            const resume = document.getElementById('resume-text').value.trim();
+            const jd = document.getElementById('jd-text').value.trim();
+            const btn = document.getElementById('analyze-btn');
+            const spinner = document.getElementById('btn-spinner');
+            const btnText = document.getElementById('btn-text');
+
+            if (!resume || !jd) {
+                alert('Please provide both resume and job description');
+                return;
+            }
+
+            btn.disabled = true;
+            spinner.classList.remove('hidden');
+            spinner.classList.add('spin');
+            btnText.textContent = 'Analyzing...';
+
+            try {
+                const res = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ resume, jd })
+                });
+                const data = await res.json();
+                displayResults(data);
+            } catch (err) {
+                alert('Error: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                spinner.classList.add('hidden');
+                spinner.classList.remove('spin');
+                btnText.textContent = 'Analyze Match';
+            }
+        }
+
+        function displayResults(data) {
+            const container = document.getElementById('results-container');
+            container.classList.remove('hidden');
+
+            // Match score
+            const score = parseInt(data.match_score) || 0;
+            document.getElementById('match-score').textContent = score + '%';
+            
+            const circumference = 502.4;
+            const offset = circumference - (score / 100) * circumference;
+            document.getElementById('score-circle').style.strokeDashoffset = offset;
+
+            const evalEl = document.getElementById('match-evaluation');
+            if (score >= 80) {
+                evalEl.textContent = 'Excellent match! Strong alignment with requirements.';
+                evalEl.className = 'text-emerald-400 mt-2';
+            } else if (score >= 60) {
+                evalEl.textContent = 'Good match. Some improvements can strengthen your application.';
+                evalEl.className = 'text-amber-400 mt-2';
+            } else {
+                evalEl.textContent = 'Consider significant revisions to better align with this role.';
+                evalEl.className = 'text-red-400 mt-2';
+            }
+
+            // Missing keywords
+            const kwContainer = document.getElementById('missing-keywords');
+            if (data.missing_keywords && data.missing_keywords.length) {
+                kwContainer.innerHTML = data.missing_keywords.map(k => 
+                    `<span class="keyword-tag">${k}</span>`
+                ).join('');
+            } else {
+                kwContainer.innerHTML = '<p class="text-emerald-400">No missing keywords detected!</p>';
+            }
+
+            // Suggestions
+            const sugContainer = document.getElementById('improvement-suggestions');
+            if (data.improvement_suggestions && data.improvement_suggestions.length) {
+                sugContainer.innerHTML = data.improvement_suggestions.map(s => 
+                    `<li class="flex gap-3">
+                        <svg class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span class="text-sm">${s}</span>
+                    </li>`
+                ).join('');
+            } else {
+                sugContainer.innerHTML = '<li class="text-[var(--muted)]">No suggestions</li>';
+            }
+
+            // Bullet point
+            const bulletContainer = document.getElementById('rewritten-bullet');
+            bulletContainer.innerHTML = `<p>${data.rewritten_bullet || 'No bullet point generated'}</p>`;
+
+            // Note
+            const note = document.getElementById('response-note');
+            if (data.note) {
+                note.textContent = data.note;
+                note.classList.remove('hidden');
+            } else {
+                note.classList.add('hidden');
+            }
+
+            container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    </script>
+</body>
+</html>
+
