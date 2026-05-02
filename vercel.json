@@ -1,0 +1,15 @@
+{
+  "buildCommand": "echo 'No build needed'",
+  "devCommand": "python3 app.py",
+  "installCommand": "pip3 install flask --break-system-packages",
+  "framework": "python",
+  "env": {
+    "USE_MOCK": "true"
+  },
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/app.py"
+    }
+  ]
+}

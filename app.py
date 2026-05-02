@@ -108,16 +108,16 @@ def get_mock_response(resume, jd):
             if added >= 3:
                 break
             kw_lower = kw.lower()
-            if any(f in kw_lower for f in ['python', 'django', 'flask', 'framework']) and added < 3:
+            if added < 3 and any(f in kw_lower for f in ['python', 'django', 'flask', 'framework']):
                 suggestions.append("Highlight Python framework experience (Django/Flask) and REST API development")
                 added += 1
-            elif any(f in kw_lower for f in ['postgresql', 'mysql', 'database', 'sql']) and added < 3:
+            elif added < 3 and any(f in kw_lower for f in ['postgresql', 'mysql', 'database', 'sql']):
                 suggestions.append("Include database experience (PostgreSQL, MySQL) and query optimization")
                 added += 1
-            elif any(f in kw_lower for f in ['aws', 'cloud', 'docker', 'kubernetes']) and added < 3:
+            elif added < 3 and any(f in kw_lower for f in ['aws', 'cloud', 'docker', 'kubernetes']):
                 suggestions.append("Mention cloud deployment and containerization experience")
                 added += 1
-            elif any(f in kw_lower for f in ['performance', 'redis', 'optimize']) and added < 3:
+            elif added < 3 and any(f in kw_lower for f in ['performance', 'redis', 'optimize']):
                 suggestions.append("Quantify performance improvements with metrics")
                 added += 1
     
@@ -245,24 +245,28 @@ def analyze():
     jd = data.get('jd', '')
     if not resume or not jd:
         return jsonify({"error": "Both resume and job description are required"}), 400
-    prompt = f"""Compare these resume and job description. Provide structured output:
-MATCH_SCORE: [0-100]
-MISSING_KEYWORDS:
-- keyword
-IMPROVEMENT_SUGGESTIONS:
-- suggestion
-REWRITTEN_BULLET:
-[bullet]
-Resume: {resume}
-Job Description: {jd}"""
-    ollama_result = query_ollama(prompt)
-    if ollama_result and 'response' in ollama_result:
-        parsed = parse_ollama_response_v2(ollama_result['response'], resume, jd)
-        return jsonify(parsed)
-    elif ollama_result and isinstance(ollama_result, dict):
-        return jsonify(ollama_result)
+    
+    # On Vercel or when Ollama is not available, use mock responses
+    # Vercel sets VERCEL environment variable, or check for Ollama availability
+    use_mock = os.environ.get('VERCEL') is not None or os.environ.get('USE_MOCK') == 'true'
+    
+    if not use_mock:
+        try:
+            ollama_result = query_ollama(prompt)
+            if ollama_result and 'response' in ollama_result:
+                import re
+                # Quick check: if response looks like HTML (Vercel error), fallback
+                if ollama_result['response'].strip().startswith('<!DOCTYPE'):
+                    use_mock = True
+                else:
+                    parsed = parse_ollama_response_v2(ollama_result['response'], resume, jd)
+                    return jsonify(parsed)
+        except Exception:
+            use_mock = True
+    
+    # Use mock response (works everywhere including Vercel)
     mock = get_mock_response(resume, jd)
-    mock['note'] = 'Mock response (Ollama not available)'
+    mock['note'] = 'Mock analysis (Ollama not available in this environment)'
     return jsonify(mock)
 
 
